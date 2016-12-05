@@ -22,10 +22,10 @@ export default class Nonogram
         this.solved = false;
         this.transposed = false;
 
-        for(let i = 0; i < this.x_dim; i++)
+        for(let i = 0; i < this.y_dim; i++)
         {
             this.board[i] = [];
-            for(let j = 0; j < this.y_dim; j++)
+            for(let j = 0; j < this.x_dim; j++)
             {
                 this.board[i][j] = field.UNDEFINED;
                 for(let block of json.level.blocks)
@@ -41,6 +41,8 @@ export default class Nonogram
 
     public show()
     {
+        let solution_x_dim = this.x_dim;
+        let solution_y_dim = this.y_dim;
         let solution = this.board;
         if(this.transposed)
         {
@@ -49,13 +51,15 @@ export default class Nonogram
                     return row[i]
                 })
             });
+            solution_x_dim = this.y_dim;
+            solution_y_dim = this.x_dim;
         }
 
-        for(let i = 0; i < this.x_dim; i++)
+        for(let j = 0; j < solution_y_dim; j++)
         {
-            for(let j = 0; j < this.y_dim; j++)
+            for(let i = 0; i < solution_x_dim; i++)
             {
-                switch(solution[i][j])
+                switch(solution[j][i])
                 {
                     case field.UNDEFINED:
                     {
@@ -91,12 +95,12 @@ export default class Nonogram
     private _solve_boxes()
     {
         console.log('[Solver] Applying boxes algorithm...');
-        for (let i = 0; i < this.x_dim; i++)
+        for (let i = 0; i < this.y_dim; i++)
             this._simple_boxes(i, this.x_clues[i]);
 
         this._transpose();
 
-        for (let i = 0; i < this.x_dim; i++)
+        for (let i = 0; i < this.y_dim; i++)
             this._simple_boxes(i, this.y_clues[i]);
 
         this._transpose();
@@ -126,12 +130,12 @@ export default class Nonogram
     private _solve_spaces()
     {
         console.log('[Solver] Applying spaces algorithm...');
-        for (let i = 0; i < this.x_dim; i++)
+        for (let i = 0; i < this.y_dim; i++)
             this._simple_spaces(i, this.x_clues[i]);
 
         this._transpose();
 
-        for (let i = 0; i < this.x_dim; i++)
+        for (let i = 0; i < this.y_dim; i++)
             this._simple_spaces(i, this.y_clues[i]);
 
         this._transpose();
@@ -141,65 +145,90 @@ export default class Nonogram
     private _simple_spaces(index: number, clues: number[])
     {
         let min_field: number = 0;
-        let max_field: number = this.x_dim;
+        let max_field: number = this.x_dim - 1;
         let left_unaccounted_clue: number = 0;
         let right_unaccounted_clue: number = clues.length - 1;
-        let found: boolean;
 
-
-        let left = () =>
+        // Left search
+        let found: boolean = true;
+        while (found && left_unaccounted_clue < clues.length && min_field < this.x_dim)
         {
             let i = min_field;
-            let field_count = 0;
+            let space_field_count = 0;
+            let block_field_count = 0;
             found = false;
 
             // scorro i field spaces/undefined fino a trovare un blocco
-            while(this.board[index][i] != field.BLOCK)
+            while(i < this.x_dim && this.board[index][i] != field.BLOCK)
             {
                 i++;
-                field_count++;
+                space_field_count++;
             }
 
-            // se non ci sta allora il blocco trovato appartiene al primo clue non accounted
-            if(field_count < clues[left_unaccounted_clue])
+            while(i < this.x_dim && this.board[index][i] == field.BLOCK)
             {
-                field_count = 0;
+                i++;
+                block_field_count++;
+            }
 
-                // conto quanti neri contigui ci sono
-                while(this.board[index][i] == field.BLOCK)
-                {
-                    i++;
-                    field_count++;
-                }
+            if(space_field_count < clues[left_unaccounted_clue])
+            {
+                let block_extension = clues[left_unaccounted_clue] - block_field_count;
+                let space_extension = min_field + space_field_count - block_extension;
 
-                let block_extension = clues[left_unaccounted_clue] - field_count;
-                let available_fields = i - min_field;
-
-                if(available_fields > clues[left_unaccounted_clue])
-                {
-                    // inserisco gli spazi a sinistra
-                    for(let j = min_field; j < available_fields - clues[left_unaccounted_clue]; j++)
-                        this.board[index][j] = field.SPACE;
-                }
+                for(let j = min_field; j < space_extension; j++)
+                    this.board[index][j] = field.SPACE;
 
                 min_field = i + block_extension;
-
+                if(block_extension == 0)
+                {
+                    this.board[index][i] = field.SPACE;
+                    min_field++;
+                }
                 left_unaccounted_clue++;
                 found = true;
             }
-            else
+        }
+
+        //Right search
+        found = true;
+        while (found && right_unaccounted_clue > -1 && max_field > -1)
+        {
+            let i = max_field;
+            let space_field_count = 0;
+            let block_field_count = 0;
+            found = false;
+
+            // scorro i field spaces/undefined fino a trovare un blocco
+            while(i > -1 && this.board[index][i] != field.BLOCK)
             {
-                // TODO: implement this
+                i--;
+                space_field_count++;
             }
 
-        };
+            while(i > -1 && this.board[index][i] == field.BLOCK)
+            {
+                i--;
+                block_field_count++;
+            }
 
-        while(found)
-            left();
+            if(space_field_count < clues[right_unaccounted_clue])
+            {
+                let block_extension = clues[right_unaccounted_clue] - block_field_count;
+                let space_extension = max_field + 1 - space_field_count + block_extension;
 
-        function right()
-        {
-            // TODO: implement this
+                for(let j = space_extension; j < max_field; j++)
+                    this.board[index][j] = field.SPACE;
+
+                max_field = i - block_extension;
+                if(block_extension == 0)
+                {
+                    this.board[index][i] = field.SPACE;
+                    max_field--;
+                }
+                right_unaccounted_clue--;
+                found = true;
+            }
         }
     }
 
