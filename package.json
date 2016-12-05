@@ -1,5 +1,8 @@
 {
   "name": "Nonogram",
   "version": "0.0.1",
-  "author": "Marco Moschettini"
+  "author": "Marco Moschettini",
+  "scripts": {
+    "postinstall": "typings install"
+  }
 }
