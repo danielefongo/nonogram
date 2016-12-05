@@ -83,30 +83,23 @@ export default class Nonogram
     public solve()
     {
         console.log('[Solver] Started solving puzzle...');
-        this.show();
-        for(let i = 0; i < this.x_dim; i++)
+
+        this._solve_boxes();
+        this._solve_spaces();
+    }
+
+    private _solve_boxes()
+    {
+        console.log('[Solver] Applying boxes algorithm...');
+        for (let i = 0; i < this.x_dim; i++)
             this._simple_boxes(i, this.x_clues[i]);
 
-        this.show();
         this._transpose();
 
-        for(let i = 0; i < this.x_dim; i++)
-        {
+        for (let i = 0; i < this.x_dim; i++)
             this._simple_boxes(i, this.y_clues[i]);
-        }
-        this.show();
 
         this._transpose();
-
-        for(let i = 0; i < this.x_dim; i++)
-            this._simple_spaces(i, this.x_clues[i]);
-
-        this.show();
-        this._transpose();
-
-        for(let i = 0; i < this.x_dim; i++)
-            this._simple_spaces(i, this.y_clues[i]);
-
         this.show();
     }
 
@@ -128,6 +121,21 @@ export default class Nonogram
             for(let j = min_field + spaces; j < max_field - spaces; j++)
                 this.board[index][j] = field.BLOCK;
         }
+    }
+
+    private _solve_spaces()
+    {
+        console.log('[Solver] Applying spaces algorithm...');
+        for (let i = 0; i < this.x_dim; i++)
+            this._simple_spaces(i, this.x_clues[i]);
+
+        this._transpose();
+
+        for (let i = 0; i < this.x_dim; i++)
+            this._simple_spaces(i, this.y_clues[i]);
+
+        this._transpose();
+        this.show();
     }
 
     private _simple_spaces(index: number, clues: number[])
@@ -195,6 +203,7 @@ export default class Nonogram
         }
     }
 
+    //region UTILITIES
     private _transpose()
     {
         // It's a kind of magic
@@ -210,4 +219,5 @@ export default class Nonogram
 
         this.transposed = !this.transposed;
     }
+    //endregion
 }
