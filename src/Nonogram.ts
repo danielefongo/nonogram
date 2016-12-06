@@ -90,6 +90,7 @@ export default class Nonogram
 
         this._solve_boxes();
         this._solve_spaces();
+        this._solve_force();
     }
 
     private _solve_boxes()
@@ -158,7 +159,6 @@ export default class Nonogram
             let block_field_count = 0;
             found = false;
 
-            // scorro i field spaces/undefined fino a trovare un blocco
             while(i < this.x_dim && this.board[index][i] != field.BLOCK)
             {
                 i++;
@@ -199,7 +199,6 @@ export default class Nonogram
             let block_field_count = 0;
             found = false;
 
-            // scorro i field spaces/undefined fino a trovare un blocco
             while(i > -1 && this.board[index][i] != field.BLOCK)
             {
                 i--;
@@ -232,6 +231,112 @@ export default class Nonogram
         }
     }
 
+    private _solve_force()
+    {
+        console.log('[Solver] Applying force algorithm...');
+        for (let i = 0; i < this.y_dim; i++)
+            this._force(i, this.x_clues[i]);
+
+        this._transpose();
+
+        for (let i = 0; i < this.y_dim; i++)
+            this._force(i, this.y_clues[i]);
+
+        this._transpose();
+        this.show();
+    }
+
+    private _force(index: number, clues: number[])
+    {
+        let min_field: number = 0;
+        let max_field: number = this.x_dim - 1;
+        let left_unaccounted_clue: number = 0;
+        let right_unaccounted_clue: number = clues.length - 1;
+
+        // Left search
+        let found: boolean = true;
+        while (found && left_unaccounted_clue < clues.length && min_field < this.x_dim)
+        {
+            let i = min_field;
+            let available_field_count = 0;
+            found = false;
+
+            //definiamo una sezione "disponibile" facendo lo split per spazi
+            while(i < this.x_dim && this.board[index][i] != field.SPACE)
+            {
+                i++;
+                available_field_count++;
+            }
+
+            // Se lo spazio disponibile non contiene il left_unaccounted_clue, lo riempo di spazi
+            if(available_field_count < clues[left_unaccounted_clue])
+            {
+                for (let j = min_field; j < i; j++)
+                    this.board[index][j] = field.SPACE;
+                found = true;
+            }
+            // Se lo spazio disponibile contiene il left_unaccounted_clue e tuttavia non contiene anche il successivo clue, parti obbligatorie
+            // TODO: da controllare!
+            // what if: il left_unaccounted_clue potrebbe appartenere invece alla sezione successiva?
+            else if(left_unaccounted_clue == clues.length - 1 || available_field_count < clues[left_unaccounted_clue] + clues[left_unaccounted_clue + 1])
+            {
+                let undefined_field_count = available_field_count - clues[left_unaccounted_clue];
+
+                for (let j = min_field + undefined_field_count; j < min_field + clues[left_unaccounted_clue]; j++)
+                    this.board[index][j] = field.BLOCK;
+
+                left_unaccounted_clue++;
+                found = true;
+            }
+
+            while(found && i < this.x_dim && this.board[index][i] == field.SPACE)
+            {
+                i++;
+            }
+
+            if(found) min_field = i;
+        }
+
+        // Right search
+        found = true;
+        while (found && right_unaccounted_clue > -1 && max_field > -1)
+        {
+            let i = max_field;
+            let available_field_count = 0;
+            found = false;
+
+            while(i > -1 && this.board[index][i] != field.SPACE)
+            {
+                i--;
+                available_field_count++;
+            }
+
+            if(available_field_count < clues[right_unaccounted_clue])
+            {
+                for (let j = i + 1; j < max_field + 1; j++)
+                    this.board[index][j] = field.SPACE;
+                found = true;
+            }
+            else if(right_unaccounted_clue == 0 || available_field_count < clues[right_unaccounted_clue] + clues[right_unaccounted_clue + 1])
+            {
+                let undefined_field_count = available_field_count - clues[right_unaccounted_clue];
+
+                for (let j = i + undefined_field_count + 1; j < max_field - undefined_field_count + 1; j++)
+                    this.board[index][j] = field.BLOCK;
+
+                right_unaccounted_clue++;
+                found = true;
+            }
+
+            while(found && i > - 1 && this.board[index][i] == field.SPACE)
+            {
+                i--;
+            }
+
+            if(found) min_field = i;
+        }
+    }
+
     //region UTILITIES
     private _transpose()
     {
@@ -248,5 +353,6 @@ export default class Nonogram
 
         this.transposed = !this.transposed;
     }
+
     //endregion
 }
