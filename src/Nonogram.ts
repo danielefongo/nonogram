@@ -323,6 +323,7 @@ export default class Nonogram
     //region UTILITIES
     public _clues_fit_problem(index: number, fields: {length: number, start: number, end: number}[], clues: number[]): boolean
     {
+        // TODO: Consider actual block fields in the row (right sub-problem)!
         let left_unaccounted_clue: number = 0;
         let fitting_clues_size: number = 0;
         let fits: boolean = true;
