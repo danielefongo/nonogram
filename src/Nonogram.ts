@@ -20,7 +20,6 @@ export default class Nonogram
     public board: Cell[][];
     public unsolved: number[][]; // [transposed(0 = rows, 1 = cols), index]
 
-
     public constructor(level: string)
     {
         let json = require(level);
@@ -102,8 +101,6 @@ export default class Nonogram
                     return row[i]
                 })
             });
-            solution_x_dim = this.dim[1];
-            solution_y_dim = this.dim[0];
         }
 
         for(let j = 0; j < solution_y_dim; j++)
@@ -135,19 +132,30 @@ export default class Nonogram
         console.log('');
     }
 
-
     public solve()
     {
         console.log('[Solver] Started solving puzzle...');
 
         for(let i = 0; this.unsolved[this.transposed].length > 0 && i < 100; i++)
         {
-            console.log(i.toString(),'-th iteration');
+            console.log(i.toString(),'-th iteration / transposed: ',this.transposed);
+            //console.log(this.unsolved[0]);
+            //console.log(this.unsolved[1]);
             let j = 0;
             while(j < this.unsolved[this.transposed].length)
             {
                 let index: number = this.unsolved[this.transposed][j];
+                if(i==3 && index == 10)
+                {
+                    console.log(this.clues[this.transposed][index]);
+                }
                 this._analyse(index);
+                if(i==3 && index == 10)
+                {
+                    console.log(this.clues[this.transposed][index]);
+                    console.log('after analysis');
+                    this.show();
+                }
                 this._simple_blocks(index);
                 this._simple_spaces(index);
                 if(this._is_completed(index))
@@ -159,7 +167,6 @@ export default class Nonogram
             this._transpose();
         }
     }
-
 
     public _is_completed(index: number): boolean
     {
@@ -179,172 +186,6 @@ export default class Nonogram
         }
         return false;
     }
-
-      /*
-    public _solve_boxes()
-    {
-        console.log('[Solver] Applying boxes algorithm...');
-        for (let i = 0; i < this.unsolved_rows.length; i++)
-            this._simple_boxes(this.unsolved_rows[i], this.x_clues[this.unsolved_rows[i]]);
-
-        this._transpose();
-
-        for (let i = 0; i < this.unsolved_cols.length; i++)
-            this._simple_boxes(this.unsolved_cols[i], this.y_clues[this.unsolved_cols[i]]);
-
-        this._transpose();
-        this.show();
-    }
-
-    public _simple_boxes(index: number, clues: Clue[])
-    {
-        this._overlapping_parts(index, 0, this.x_dim - 1, clues);
-    }
-
-    public _solve_spaces()
-    {
-        console.log('[Solver] Applying spaces algorithm...');
-        for (let i = 0; i < this.unsolved_rows.length; i++)
-            this._simple_spaces(this.unsolved_rows[i], this.x_clues[this.unsolved_rows[i]]);
-
-        this._transpose();
-
-        for (let i = 0; i < this.unsolved_cols.length; i++)
-            this._simple_spaces(this.unsolved_cols[i], this.y_clues[this.unsolved_cols[i]]);
-
-        this._transpose();
-        this.show();
-    }
-
-    public _simple_spaces(index: number, clues: Clue[])
-    {
-        let min_field: number = 0;
-        let max_field: number = this.x_dim - 1;
-        let left_unaccounted_clue: number = 0;
-        let right_unaccounted_clue: number = clues.length - 1;
-
-        // Left search
-        let found: boolean = true;
-        while (found && left_unaccounted_clue < clues.length && min_field < this.x_dim)
-        {
-            let i = min_field;
-            let space_field_count = 0;
-            let block_field_count = 0;
-            found = false;
-
-            while(i < this.x_dim && this.board[index][i] != Cell.BLOCK)
-            {
-                i++;
-                space_field_count++;
-            }
-
-            while(i < this.x_dim && this.board[index][i] == Cell.BLOCK)
-            {
-                i++;
-                block_field_count++;
-            }
-
-            if(space_field_count < clues[left_unaccounted_clue].value)
-            {
-                let block_extension = clues[left_unaccounted_clue].value - block_field_count;
-                let space_extension = min_field + space_field_count - block_extension;
-
-                for(let j = min_field; j < space_extension; j++)
-                    this.board[index][j] = Cell.SPACE;
-
-                min_field = i + block_extension;
-                if(block_extension == 0)
-                {
-                    this.board[index][i] = Cell.SPACE;
-                    min_field++;
-                }
-                left_unaccounted_clue++;
-                found = true;
-            }
-        }
-
-        //Right search
-        found = true;
-        while (found && right_unaccounted_clue > -1 && max_field > -1)
-        {
-            let i = max_field;
-            let space_field_count = 0;
-            let block_field_count = 0;
-            found = false;
-
-            while(i > -1 && this.board[index][i] != Cell.BLOCK)
-            {
-                i--;
-                space_field_count++;
-            }
-
-            while(i > -1 && this.board[index][i] == Cell.BLOCK)
-            {
-                i--;
-                block_field_count++;
-            }
-
-            if(space_field_count < clues[right_unaccounted_clue].value)
-            {
-                let block_extension = clues[right_unaccounted_clue].value - block_field_count;
-                let space_extension = max_field + 1 - space_field_count + block_extension;
-
-                for(let j = space_extension; j < max_field; j++)
-                    this.board[index][j] = Cell.SPACE;
-
-                max_field = i - block_extension;
-                if(block_extension == 0)
-                {
-                    this.board[index][i] = Cell.SPACE;
-                    max_field--;
-                }
-                right_unaccounted_clue--;
-                found = true;
-            }
-        }
-    }
-
-    public _solve_force()
-    {
-        console.log('[Solver] Applying force algorithm...');
-        for (let i = 0; i < this.unsolved_rows.length; i++)
-            this._force(this.unsolved_rows[i], this.x_clues[this.unsolved_rows[i]]);
-
-        this._transpose();
-
-        for (let i = 0; i < this.unsolved_cols.length; i++)
-            this._force(this.unsolved_cols[i], this.y_clues[this.unsolved_cols[i]]);
-
-        this._transpose();
-        this.show();
-    }
-
-    public _force(index: number, clues: Clue[])
-    {
-        let found: boolean = true;
-        let left_unaccounted_clue: number = 0;
-        let available_fields = this._split_by_spaces(index);
-        for (let field_index = 0; field_index < available_fields.length; field_index++)
-        {
-            let univocal_clues: Clue[] = [];
-            let fields_to_be_accounted: number = clues[left_unaccounted_clue].value;
-            while(found && available_fields[field_index].length >= fields_to_be_accounted && left_unaccounted_clue < clues.length)
-            {
-                found = false;
-                let univocal: boolean = !this._clues_fit_problem(index, available_fields.slice(field_index + 1), clues.slice(left_unaccounted_clue));
-                if(univocal)
-                {
-                    found = true;
-                    univocal_clues.push(clues[left_unaccounted_clue]);
-                    left_unaccounted_clue++;
-                    if(left_unaccounted_clue < clues.length) fields_to_be_accounted += 1 + clues[left_unaccounted_clue].value;
-                }
-            }
-            this._overlapping_parts(index, available_fields[field_index].start, available_fields[field_index].end,  univocal_clues);
-        }
-
-    }
-    */
 
     public _simple_blocks(index: number)
     {
@@ -402,7 +243,8 @@ export default class Nonogram
                 if (this.clues[this.transposed][index][current_clue].minstart < split_fields[current_split_field].end + 1 - available_length)
                     this.clues[this.transposed][index][current_clue].minstart = split_fields[current_split_field].end + 1 - available_length;
 
-                univocal = (current_split_field == split_fields.length - 1) || !this._clues_fit_problem(index, split_fields.slice(current_split_field + 1), this.clues[this.transposed][index].slice(current_clue));
+                //JAVASCRIPTMMMERDA! array.slice(start, end) restituisce un insieme "[start, end)", non "[start, end]" -.-
+                univocal = (current_split_field == split_fields.length - 1) || !this._clues_fit_problem(split_fields.slice(current_split_field + 1), this.clues[this.transposed][index].slice(current_clue));
                 if (univocal)
                 {
                     available_length -= this.clues[this.transposed][index][current_clue].value + 1;
@@ -437,7 +279,7 @@ export default class Nonogram
                 if (this.clues[this.transposed][index][current_clue].maxend > split_fields[current_split_field].start - 1 + available_length)
                     this.clues[this.transposed][index][current_clue].maxend = split_fields[current_split_field].start - 1 + available_length;
 
-                univocal = (current_split_field == 0) || !this._clues_fit_problem(index, split_fields.slice(0, current_split_field - 1), this.clues[this.transposed][index].slice(0, current_clue));
+                univocal = (current_split_field == 0) || !this._clues_fit_problem(split_fields.slice(0, current_split_field), this.clues[this.transposed][index].slice(0, current_clue + 1));
                 if (univocal)
                 {
                     available_length -= this.clues[this.transposed][index][current_clue].value + 1;
@@ -518,23 +360,34 @@ export default class Nonogram
         return possible_clues;
     }
 
-    public _clues_fit_problem(index: number, split_fields: Field[], clues: Clue[]): boolean
+    public _clues_fit_problem(split_fields: Field[], clues: Clue[]): boolean
     {
-        let left_unaccounted_clue: number = 0;
-        let fitting_clues_size: number = 0;
-        let fits: boolean = true;
-        for(let i = 0; i < split_fields.length && left_unaccounted_clue < clues.length; i++)
+        let current_clue: number = 0;
+        let current_split_field: number = 0;
+
+        //if (clues.length == 0) return true;
+        //if (split_fields.length == 0) return false;
+
+        let available_length: number = split_fields[current_split_field].length;
+
+        while(current_clue < clues.length && current_split_field < split_fields.length)
         {
-            fitting_clues_size = clues[left_unaccounted_clue].value;
-            while(split_fields[i].length >= fitting_clues_size && left_unaccounted_clue < clues.length)
+            while (current_clue < clues.length && clues[current_clue].value <= available_length)
             {
-                left_unaccounted_clue++;
-                if(left_unaccounted_clue < clues.length)
-                    fitting_clues_size += 1 + clues[left_unaccounted_clue].value;
+                available_length -= clues[current_clue].value + 1;
+                current_clue++;
             }
+
+            current_split_field++;
+
+            if(current_split_field < split_fields.length)
+                available_length = split_fields[current_split_field].length;
         }
-        if(left_unaccounted_clue < clues.length) fits = false;
-        return fits;
+
+        if(current_clue < clues.length)
+            return false;
+
+        return true;
     }
 
     public _extract_block_fields(index: number, start: number, end: number): Field[]
@@ -556,7 +409,8 @@ export default class Nonogram
                 blocks_count++;
                 i++;
             }
-            block_fields.push({length: blocks_count, start: current_start, end: i - 1});
+            if(blocks_count > 0)
+                block_fields.push({length: blocks_count, start: current_start, end: i - 1});
 
             while (i <= end && this.board[index][i] != Cell.BLOCK) i++;
             current_start = i;
@@ -583,7 +437,8 @@ export default class Nonogram
                 available_count++;
                 i++;
             }
-            split_fields.push({length: available_count, start: current_start, end: i - 1});
+            if (available_count > 0)
+                split_fields.push({length: available_count, start: current_start, end: i - 1});
 
             while (i < this.dim[this.transposed] && this.board[index][i] == Cell.SPACE) i++;
             current_start = i;
