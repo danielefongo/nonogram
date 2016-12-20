@@ -45,6 +45,7 @@ export default class Nonogram
 
             for(let j = 0; j < json.level.x_clues.length; j++)
             {
+                this.x_clues[i][j] = {value: 0, minstart: 0, maxend: 0};
                 this.x_clues[i][j].value = json.level.x_clues[i][j];
                 right_clues_sum -= this.x_clues[i][j].value + 1;
                 this.x_clues[i][j].minstart = left_clues_sum;
@@ -66,6 +67,7 @@ export default class Nonogram
 
             for(let j = 0; j < json.level.y_clues.length; j++)
             {
+                this.y_clues[i][j] = {value: 0, minstart: 0, maxend: 0};
                 this.y_clues[i][j].value = json.level.y_clues[i][j];
                 right_clues_sum -= this.y_clues[i][j].value + 1;
                 this.y_clues[i][j].minstart = left_clues_sum;
@@ -167,7 +169,7 @@ export default class Nonogram
                 if(this.board[this.unsolved_rows[i]][j] == field.BLOCK) block_count++;
 
             for(let j = 0; j < this.x_clues[this.unsolved_rows[i]].length; j++)
-                clue_count += this.x_clues[this.unsolved_rows[i]][j];
+                clue_count += this.x_clues[this.unsolved_rows[i]][j].value;
 
             if (clue_count == block_count)
             {
@@ -188,7 +190,7 @@ export default class Nonogram
                 if(this.board[this.unsolved_cols[i]][j] == field.BLOCK) block_count++;
 
             for(let j = 0; j < this.y_clues[this.unsolved_cols[i]].length; j++)
-                clue_count += this.y_clues[this.unsolved_cols[i]][j];
+                clue_count += this.y_clues[this.unsolved_cols[i]][j].value;
 
             if (clue_count == block_count)
             {
@@ -219,7 +221,7 @@ export default class Nonogram
         this.show();
     }
 
-    public _simple_boxes(index: number, clues: number[])
+    public _simple_boxes(index: number, clues: Clue[])
     {
         this._overlapping_parts(index, 0, this.x_dim - 1, clues);
     }
@@ -239,7 +241,7 @@ export default class Nonogram
         this.show();
     }
 
-    public _simple_spaces(index: number, clues: number[])
+    public _simple_spaces(index: number, clues: Clue[])
     {
         let min_field: number = 0;
         let max_field: number = this.x_dim - 1;
@@ -267,9 +269,9 @@ export default class Nonogram
                 block_field_count++;
             }
 
-            if(space_field_count < clues[left_unaccounted_clue])
+            if(space_field_count < clues[left_unaccounted_clue].value)
             {
-                let block_extension = clues[left_unaccounted_clue] - block_field_count;
+                let block_extension = clues[left_unaccounted_clue].value - block_field_count;
                 let space_extension = min_field + space_field_count - block_extension;
 
                 for(let j = min_field; j < space_extension; j++)
@@ -307,9 +309,9 @@ export default class Nonogram
                 block_field_count++;
             }
 
-            if(space_field_count < clues[right_unaccounted_clue])
+            if(space_field_count < clues[right_unaccounted_clue].value)
             {
-                let block_extension = clues[right_unaccounted_clue] - block_field_count;
+                let block_extension = clues[right_unaccounted_clue].value - block_field_count;
                 let space_extension = max_field + 1 - space_field_count + block_extension;
 
                 for(let j = space_extension; j < max_field; j++)
@@ -342,15 +344,15 @@ export default class Nonogram
         this.show();
     }
 
-    public _force(index: number, clues: number[])
+    public _force(index: number, clues: Clue[])
     {
         let found: boolean = true;
         let left_unaccounted_clue: number = 0;
         let available_fields = this._split_by_spaces(index);
         for (let field_index = 0; field_index < available_fields.length; field_index++)
         {
-            let univocal_clues: number[] = [];
-            let fields_to_be_accounted = clues[left_unaccounted_clue];
+            let univocal_clues: Clue[] = [];
+            let fields_to_be_accounted: number = clues[left_unaccounted_clue].value;
             while(found && available_fields[field_index].length >= fields_to_be_accounted && left_unaccounted_clue < clues.length)
             {
                 found = false;
@@ -360,7 +362,7 @@ export default class Nonogram
                     found = true;
                     univocal_clues.push(clues[left_unaccounted_clue]);
                     left_unaccounted_clue++;
-                    if(left_unaccounted_clue < clues.length) fields_to_be_accounted += 1 + clues[left_unaccounted_clue];
+                    if(left_unaccounted_clue < clues.length) fields_to_be_accounted += 1 + clues[left_unaccounted_clue].value;
                 }
             }
             this._overlapping_parts(index, available_fields[field_index].start, available_fields[field_index].end,  univocal_clues);
@@ -369,7 +371,7 @@ export default class Nonogram
     }
 
     //region UTILITIES
-    public _clues_fit_problem(index: number, fields: {length: number, start: number, end: number}[], clues: number[]): boolean
+    public _clues_fit_problem(index: number, fields: {length: number, start: number, end: number}[], clues: Clue[]): boolean
     {
         // TODO: Consider actual block fields in the row (right sub-problem)!
         let left_unaccounted_clue: number = 0;
@@ -377,12 +379,12 @@ export default class Nonogram
         let fits: boolean = true;
         for(let i = 0; i < fields.length && left_unaccounted_clue < clues.length; i++)
         {
-            fitting_clues_size = clues[left_unaccounted_clue];
+            fitting_clues_size = clues[left_unaccounted_clue].value;
             while(fields[i].length >= fitting_clues_size && left_unaccounted_clue < clues.length)
             {
                 left_unaccounted_clue++;
                 if(left_unaccounted_clue < clues.length)
-                    fitting_clues_size += 1 + clues[left_unaccounted_clue];
+                    fitting_clues_size += 1 + clues[left_unaccounted_clue].value;
             }
         }
         if(left_unaccounted_clue < clues.length) fits = false;
@@ -429,7 +431,7 @@ export default class Nonogram
         this.transposed = !this.transposed;
     }
 
-    public _overlapping_parts(index: number, start: number, end: number, clues: number[])
+    public _overlapping_parts(index: number, start: number, end: number, clues: Clue[])
     {
         for(let i = 0; i < clues.length; i++)
         {
@@ -437,12 +439,12 @@ export default class Nonogram
             let max_field: number = end + 1 - (clues.length - 1 - i);
 
             for(let j = 0; j < i; j++)
-                min_field += clues[j];
+                min_field += clues[j].value;
 
             for(let j = i + 1; j < clues.length; j++)
-                max_field -= clues[j];
+                max_field -= clues[j].value;
 
-            let spaces = max_field - min_field - clues[i];
+            let spaces = max_field - min_field - clues[i].value;
 
             for(let j = min_field + spaces; j < max_field - spaces; j++)
                 this.board[index][j] = field.BLOCK;
