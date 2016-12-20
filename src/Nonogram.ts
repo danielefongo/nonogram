@@ -1,11 +1,17 @@
 enum field {BLOCK, SPACE, UNDEFINED}
 
+declare type Clue = {
+    value: number,
+    minstart: number,
+    maxend: number
+}
+
 export default class Nonogram
 {
     private x_dim: number;
     private y_dim: number;
-    private x_clues: number[][];
-    private y_clues: number[][];
+    private x_clues: Clue[][];
+    private y_clues: Clue[][];
     private board: field[][];
     private unsolved_rows: number[] = [];
     private unsolved_cols: number[] = [];
@@ -19,12 +25,54 @@ export default class Nonogram
         this.y_dim = json.level.y_dim;
 
         this.board = [];
-        this.x_clues = json.level.x_clues;
-        this.y_clues = json.level.y_clues;
+        this.x_clues = [];//json.level.x_clues;
+        this.y_clues = [];//json.level.y_clues;
         this.solved = false;
         this.transposed = false;
         for(let i = 0; i< this.y_dim; i++) this.unsolved_rows[i] = i;
         for(let i = 0; i< this.x_dim; i++) this.unsolved_cols[i] = i;
+
+        //x_clues inizialization
+        for(let i = 0; i < this.y_dim; i++)
+        {
+            this.x_clues[i] = [];
+            let left_clues_sum = 0;
+            let right_clues_sum = 0;
+            for(let j = 0; j < json.level.x_clues.length; j++)
+            {
+                right_clues_sum += json.level.x_clues[i][j]+1;
+            }
+
+            for(let j = 0; j < json.level.x_clues.length; j++)
+            {
+                this.x_clues[i][j].value = json.level.x_clues[i][j];
+                right_clues_sum -= this.x_clues[i][j].value + 1;
+                this.x_clues[i][j].minstart = left_clues_sum;
+                this.x_clues[i][j].maxend = this.x_dim - 1 - right_clues_sum;
+                left_clues_sum += this.x_clues[i][j].value + 1;
+            }
+        }
+
+        //y_clues inizialization
+        for(let i = 0; i < this.x_dim; i++)
+        {
+            this.y_clues[i] = [];
+            let left_clues_sum = 0;
+            let right_clues_sum = 0;
+            for(let j = 0; j < json.level.y_clues.length; j++)
+            {
+                right_clues_sum += json.level.y_clues[i][j]+1;
+            }
+
+            for(let j = 0; j < json.level.y_clues.length; j++)
+            {
+                this.y_clues[i][j].value = json.level.y_clues[i][j];
+                right_clues_sum -= this.y_clues[i][j].value + 1;
+                this.y_clues[i][j].minstart = left_clues_sum;
+                this.y_clues[i][j].maxend = this.y_dim - 1 - right_clues_sum;
+                left_clues_sum += this.y_clues[i][j].value + 1;
+            }
+        }
 
         for(let i = 0; i < this.y_dim; i++)
         {
