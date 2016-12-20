@@ -14,33 +14,34 @@ declare type Field = {
 
 export default class Nonogram
 {
-    private dim: number[] = []; //[0 = x_dim, 1 = y_dim]
-    //private y_dim: number;
-    private transposed: number; //[0 = not transposed, 1 = transposed]
-    private clues: Clue[][][] = []; //[transposed (0 = x_clues, 1 = y_clues), index, clue_number]
-    //private y_clues: Clue[][];
-    private board: Cell[][] = [];
-    private unsolved_rows: number[] = [];
-    private unsolved_cols: number[] = [];
-    private solved: boolean;
-
+    public transposed: number; //[0 = not transposed, 1 = transposed]
+    public dim: number[]; //[0 = x_dim, 1 = y_dim]
+    public clues: Clue[][][]; //[transposed (0 = x_clues, 1 = y_clues), index, clue_number]
+    public board: Cell[][];
+    public unsolved: number[][]; // [transposed(0 = rows, 1 = cols), index]
 
 
     public constructor(level: string)
     {
         let json = require(level);
+
+        this.transposed = 0;
+
+        this.dim = [];
         this.dim[0] = json.level.x_dim;
         this.dim[1] = json.level.y_dim;
 
-        this.board = [];
-        this.clues = [];//json.level.x_clues;
+        this.clues = [];
         this.clues[0] = [];
         this.clues[1] = [];
-        //this.y_clues = [];//json.level.y_clues;
-        this.solved = false;
-        this.transposed = 0;
-        for(let i = 0; i< this.dim[1]; i++) this.unsolved_rows[i] = i;
-        for(let i = 0; i< this.dim[0]; i++) this.unsolved_cols[i] = i;
+
+        this.board = [];
+
+        this.unsolved = []
+        this.unsolved[0] = [];
+        this.unsolved[1] = [];
+        for(let i = 0; i < this.dim[1]; i++) this.unsolved[0][i] = i;
+        for(let i = 0; i < this.dim[0]; i++) this.unsolved[1][i] = i;
 
         //clues inizialization
         for(let T = 0; T < 2; T++)
@@ -50,15 +51,15 @@ export default class Nonogram
                 this.clues[T][i] = [];
                 let left_clues_sum = 0;
                 let right_clues_sum = 0;
-                for (let j = 0; j < json.level.x_clues.length; j++)
+                for (let j = 0; j < json.level.clues[T][i].length; j++)
                 {
-                    right_clues_sum += json.level.x_clues[i][j] + 1;
+                    right_clues_sum += json.level.clues[T][i][j] + 1;
                 }
 
-                for (let j = 0; j < json.level.x_clues.length; j++)
+                for (let j = 0; j < json.level.clues[T][i].length; j++)
                 {
                     this.clues[T][i][j] = {value: 0, minstart: 0, maxend: 0};
-                    this.clues[T][i][j].value = json.level.x_clues[i][j];
+                    this.clues[T][i][j].value = json.level.clues[T][i][j];
                     right_clues_sum -= this.clues[T][i][j].value + 1;
                     this.clues[T][i][j].minstart = left_clues_sum;
                     this.clues[T][i][j].maxend = this.dim[T] - 1 - right_clues_sum;
@@ -134,70 +135,52 @@ export default class Nonogram
         console.log('');
     }
 
-    /*
+
     public solve()
     {
         console.log('[Solver] Started solving puzzle...');
 
-        this._solve_boxes();
-        for(let i = 0; this.unsolved_rows.length > 0 && this.unsolved_cols.length > 0 && i < 100; i++)
+        for(let i = 0; this.unsolved[this.transposed].length > 0 && i < 100; i++)
         {
             console.log(i.toString(),'-th iteration');
-            this._solve_spaces();
-            this._check_and_fill();
-            this._solve_force();
-            this._check_and_fill();
+            let j = 0;
+            while(j < this.unsolved[this.transposed].length)
+            {
+                let index: number = this.unsolved[this.transposed][j];
+                this._analyse(index);
+                this._simple_blocks(index);
+                this._simple_spaces(index);
+                if(this._is_completed(index))
+                    this.unsolved[this.transposed].splice(j, 1);
+                else
+                    j++;
+            }
+            this.show();
+            this._transpose();
         }
     }
 
-    public _check_and_fill()
+
+    public _is_completed(index: number): boolean
     {
-        console.log('[Solver] Checking...');
-        for (let i = 0; i < this.unsolved_rows.length; i++)
+        let block_sum: number = 0;
+        let clue_sum: number = 0;
+        for(let j = 0; j < this.dim[this.transposed]; j++)
+            if(this.board[index][j] == Cell.BLOCK) block_sum++;
+
+        for(let j = 0; j < this.clues[this.transposed][index].length; j++)
+            clue_sum += this.clues[this.transposed][index][j].value;
+
+        if (clue_sum == block_sum)
         {
-            let block_count: number = 0;
-            let clue_count: number = 0;
-            for(let j = 0; j < this.x_dim; j++)
-                if(this.board[this.unsolved_rows[i]][j] == Cell.BLOCK) block_count++;
-
-            for(let j = 0; j < this.clues[0][this.unsolved_rows[i]].length; j++)
-                clue_count += this.clues[0][this.unsolved_rows[i]][j].value;
-
-            if (clue_count == block_count)
-            {
-                for(let j = 0; j < this.x_dim; j++)
-                    if(this.board[this.unsolved_rows[i]][j] == Cell.UNDEFINED) this.board[this.unsolved_rows[i]][j] = Cell.SPACE;
-
-                this.unsolved_rows.splice(i, 1);
-            }
-
+            for(let j = 0; j < this.dim[this.transposed]; j++)
+                if(this.board[index][j] == Cell.UNDEFINED) this.board[index][j] = Cell.SPACE;
+            return true;
         }
-        this._transpose();
-
-        for (let i = 0; i < this.unsolved_cols.length; i++)
-        {
-            let block_count: number = 0;
-            let clue_count: number = 0;
-            for(let j = 0; j < this.y_dim; j++)
-                if(this.board[this.unsolved_cols[i]][j] == Cell.BLOCK) block_count++;
-
-            for(let j = 0; j < this.y_clues[this.unsolved_cols[i]].length; j++)
-                clue_count += this.y_clues[this.unsolved_cols[i]][j].value;
-
-            if (clue_count == block_count)
-            {
-                for(let j = 0; j < this.y_dim; j++)
-                    if(this.board[this.unsolved_cols[i]][j] == Cell.UNDEFINED) this.board[this.unsolved_cols[i]][j] = Cell.SPACE;
-
-                this.unsolved_cols.splice(i, 1);
-            }
-        }
-
-        this._transpose();
-        this.show();
+        return false;
     }
 
-
+      /*
     public _solve_boxes()
     {
         console.log('[Solver] Applying boxes algorithm...');
@@ -363,13 +346,32 @@ export default class Nonogram
     }
     */
 
-    public _overlapping_parts(index: number)
+    public _simple_blocks(index: number)
     {
         for(let i = 0; i < this.clues[this.transposed][index].length; i++)
         {
             for(let j = this.clues[this.transposed][index][i].maxend + 1 - this.clues[this.transposed][index][i].value;
                 j < this.clues[this.transposed][index][i].minstart + this.clues[this.transposed][index][i].value; j++)
                 this.board[index][j] = Cell.BLOCK;
+        }
+    }
+
+    public _simple_spaces(index: number)
+    {
+        let last_clue_maxend: number = 0;
+
+        for(let i = 0; i < this.clues[this.transposed][index].length; i++)
+        {
+            for(let j = last_clue_maxend; j < this.clues[this.transposed][index][i].minstart; j++)
+            {
+                this.board[index][j] = Cell.SPACE;
+            }
+            last_clue_maxend = this.clues[this.transposed][index][i].maxend + 1;
+        }
+
+        for(let j = last_clue_maxend; j < this.dim[this.transposed]; j++)
+        {
+            this.board[index][j] = Cell.SPACE;
         }
     }
 
@@ -391,20 +393,24 @@ export default class Nonogram
                 if (available_length == split_fields[current_split_field].length)
                     this._fill_field(index, split_fields[current_split_field], Cell.SPACE);
                 current_split_field++;
+                if(current_split_field < split_fields.length)
+                    available_length = split_fields[current_split_field].length;
             }
             // if(current_split_field == split_fields.length) IMPOSSIBLE!!!
-
-            if (this.clues[this.transposed][index][current_clue].minstart < split_fields[current_split_field].start)
-                this.clues[this.transposed][index][current_clue].minstart = split_fields[current_split_field].start;
-
-            univocal = (current_split_field == split_fields.length - 1) || !this._clues_fit_problem(index, split_fields.slice(current_split_field + 1), this.clues[this.transposed][index].slice(current_clue));
-            if (univocal)
+            if(current_split_field < split_fields.length)
             {
-                available_length -= this.clues[this.transposed][index][current_clue].value + 1;
-                if (this.clues[this.transposed][index][current_clue].maxend > split_fields[current_split_field].end)
-                    this.clues[this.transposed][index][current_clue].maxend = split_fields[current_split_field].end;
+                if (this.clues[this.transposed][index][current_clue].minstart < split_fields[current_split_field].end + 1 - available_length)
+                    this.clues[this.transposed][index][current_clue].minstart = split_fields[current_split_field].end + 1 - available_length;
 
-                current_clue++;
+                univocal = (current_split_field == split_fields.length - 1) || !this._clues_fit_problem(index, split_fields.slice(current_split_field + 1), this.clues[this.transposed][index].slice(current_clue));
+                if (univocal)
+                {
+                    available_length -= this.clues[this.transposed][index][current_clue].value + 1;
+                    if (this.clues[this.transposed][index][current_clue].maxend > split_fields[current_split_field].end)
+                        this.clues[this.transposed][index][current_clue].maxend = split_fields[current_split_field].end;
+
+                    current_clue++;
+                }
             }
         }
 
@@ -416,31 +422,37 @@ export default class Nonogram
         while (univocal && current_clue >= 0 && current_split_field >= 0)
         {
             //skip the split_fields in which the current_clue doesn't fit
-            while(available_length < this.clues[this.transposed][index][current_clue].value && current_split_field < split_fields.length)
+            while(available_length < this.clues[this.transposed][index][current_clue].value && current_split_field >= 0)
             {
                 if (available_length == split_fields[current_split_field].length)
                     this._fill_field(index, split_fields[current_split_field], Cell.SPACE);
                 current_split_field--;
+                if(current_split_field >= 0)
+                    available_length = split_fields[current_split_field].length;
             }
             // if(current_split_field == split_fields.length) IMPOSSIBLE!!!
 
-            if (this.clues[this.transposed][index][current_clue].maxend > split_fields[current_split_field].end)
-                this.clues[this.transposed][index][current_clue].maxend = split_fields[current_split_field].end;
-
-            univocal = (current_split_field == 0) || !this._clues_fit_problem(index, split_fields.slice(0, current_split_field - 1), this.clues[this.transposed][index].slice(0, current_clue));
-            if (univocal)
+            if(current_split_field >= 0)
             {
-                available_length -= this.clues[this.transposed][index][current_clue].value + 1;
-                if (this.clues[this.transposed][index][current_clue].minstart < split_fields[current_split_field].start)
-                    this.clues[this.transposed][index][current_clue].minstart = split_fields[current_split_field].start;
+                if (this.clues[this.transposed][index][current_clue].maxend > split_fields[current_split_field].start - 1 + available_length)
+                    this.clues[this.transposed][index][current_clue].maxend = split_fields[current_split_field].start - 1 + available_length;
 
-                current_clue--;
+                univocal = (current_split_field == 0) || !this._clues_fit_problem(index, split_fields.slice(0, current_split_field - 1), this.clues[this.transposed][index].slice(0, current_clue));
+                if (univocal)
+                {
+                    available_length -= this.clues[this.transposed][index][current_clue].value + 1;
+                    if (this.clues[this.transposed][index][current_clue].minstart < split_fields[current_split_field].start)
+                        this.clues[this.transposed][index][current_clue].minstart = split_fields[current_split_field].start;
+
+                    current_clue--;
+                }
             }
         }
 
         //Analyse block_fields
         let last_univocal_blockfield_clue: number = -1;
-        let last_univocal_blockfield_start: number = 0;
+        let last_univocal_blockfield_end: number = 0;
+        let is_last_blockfield_univocal: boolean = false;
 
         for(let current_split_field = 0; current_split_field < split_fields.length; current_split_field++)
         {
@@ -453,8 +465,12 @@ export default class Nonogram
                     let univocal_clue_index: number = possible_clues[0];
 
                     //JOIN!
-                    if(univocal_clue_index == last_univocal_blockfield_clue)
-                        this._fill_field(index, {length: block_fields[current_block_field].end - last_univocal_blockfield_start + 1, start: last_univocal_blockfield_start, end: block_fields[current_block_field].end}, Cell.BLOCK);
+                    if(is_last_blockfield_univocal && univocal_clue_index == last_univocal_blockfield_clue)
+                        this._fill_field(index, {length: block_fields[current_block_field].start - last_univocal_blockfield_end + 1, start: last_univocal_blockfield_end, end: block_fields[current_block_field].start}, Cell.BLOCK);
+
+                    //SPLIT!
+                    if(is_last_blockfield_univocal && univocal_clue_index != last_univocal_blockfield_clue && last_univocal_blockfield_end == block_fields[current_block_field].start - 2)
+                        this.board[index][last_univocal_blockfield_end + 1] = Cell.SPACE;
 
                     // Clue range reduction by split_field
                     if (this.clues[this.transposed][index][univocal_clue_index].minstart < split_fields[current_split_field].start)
@@ -471,7 +487,12 @@ export default class Nonogram
                         this.clues[this.transposed][index][univocal_clue_index].maxend = block_fields[current_block_field].end + extension;
 
                     last_univocal_blockfield_clue = univocal_clue_index;
-                    last_univocal_blockfield_start = block_fields[current_block_field].start;
+                    last_univocal_blockfield_end = block_fields[current_block_field].end;
+                    is_last_blockfield_univocal = true;
+                }
+                else
+                {
+                    is_last_blockfield_univocal = false;
                 }
             }
         }
@@ -524,6 +545,7 @@ export default class Nonogram
         let i: number = start;
 
         while (i <= end && this.board[index][i] != Cell.BLOCK) i++;
+        current_start = i;
 
         while (i <= end)
         {
@@ -537,7 +559,6 @@ export default class Nonogram
             block_fields.push({length: blocks_count, start: current_start, end: i - 1});
 
             while (i <= end && this.board[index][i] != Cell.BLOCK) i++;
-
             current_start = i;
         }
         return block_fields;
@@ -551,6 +572,7 @@ export default class Nonogram
         let i: number = 0;
 
         while (i < this.dim[this.transposed] && this.board[index][i] == Cell.SPACE) i++;
+        current_start = i;
 
         while (i < this.dim[this.transposed])
         {
@@ -564,7 +586,6 @@ export default class Nonogram
             split_fields.push({length: available_count, start: current_start, end: i - 1});
 
             while (i < this.dim[this.transposed] && this.board[index][i] == Cell.SPACE) i++;
-
             current_start = i;
         }
         return split_fields;
