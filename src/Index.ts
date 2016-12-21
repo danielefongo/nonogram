@@ -1,6 +1,6 @@
 import Nonogram from './Nonogram';
 
-let level = '../level-cia.json'
+let level = '../level-asian.json'
 let n = new Nonogram(level);
 
 /*
