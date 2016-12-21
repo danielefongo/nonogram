@@ -14,6 +14,10 @@ declare type Field = {
 
 export default class Nonogram
 {
+    public iteration: number;
+    public debug_line: number = -1;//14;
+    public debug_iteration: number = -1;//3;
+
     public transposed: number; //[0 = not transposed, 1 = transposed]
     public dim: number[]; //[0 = x_dim, 1 = y_dim]
     public clues: Clue[][][]; //[transposed (0 = x_clues, 1 = y_clues), index, clue_number]
@@ -89,73 +93,18 @@ export default class Nonogram
         console.log('[Solver] Level file loaded.');
     }
 
-    public show()
-    {
-        let solution_x_dim = this.dim[0];
-        let solution_y_dim = this.dim[1];
-        let solution = this.board;
-        if(this.transposed)
-        {
-            solution = solution[0].map((col, i) => {
-                return solution.map((row) => {
-                    return row[i]
-                })
-            });
-        }
-
-        for(let j = 0; j < solution_y_dim; j++)
-        {
-            for(let i = 0; i < solution_x_dim; i++)
-            {
-                switch(solution[j][i])
-                {
-                    case Cell.UNDEFINED:
-                    {
-                        process.stdout.write('□ ');
-                        break;
-                    }
-                    case Cell.BLOCK:
-                    {
-                        process.stdout.write('■ ');
-                        break;
-                    }
-                    case Cell.SPACE:
-                    {
-                        process.stdout.write('x ');
-                        break;
-                    }
-                }
-            }
-            console.log('');
-        }
-
-        console.log('');
-    }
-
     public solve()
     {
         console.log('[Solver] Started solving puzzle...');
 
-        for(let i = 0; this.unsolved[this.transposed].length > 0 && i < 100; i++)
+        for(this.iteration = 0; this.unsolved[this.transposed].length > 0 && this.iteration < 100; this.iteration++)
         {
-            console.log(i.toString(),'-th iteration / transposed: ',this.transposed);
-            //console.log(this.unsolved[0]);
-            //console.log(this.unsolved[1]);
+            console.log(this.iteration.toString(),'-th iteration / transposed: ',this.transposed);
             let j = 0;
             while(j < this.unsolved[this.transposed].length)
             {
                 let index: number = this.unsolved[this.transposed][j];
-                if(i==3 && index == 10)
-                {
-                    console.log(this.clues[this.transposed][index]);
-                }
                 this._analyse(index);
-                if(i==3 && index == 10)
-                {
-                    console.log(this.clues[this.transposed][index]);
-                    console.log('after analysis');
-                    this.show();
-                }
                 this._simple_blocks(index);
                 this._simple_spaces(index);
                 if(this._is_completed(index))
@@ -221,6 +170,13 @@ export default class Nonogram
     {
         let split_fields: Field[] = this._split_by_spaces(index);
 
+        if(this.debug_line == index && this.iteration == this.debug_iteration)
+        {
+            console.log('pre split LEFT');
+            console.log(this.clues[this.transposed][index]);
+            this.show_line(index);
+        }
+
         //Analyse split_fields from LEFT
         let current_clue: number = 0;
         let current_split_field: number = 0;
@@ -256,6 +212,13 @@ export default class Nonogram
             }
         }
 
+        if(this.debug_line == index && this.iteration == this.debug_iteration)
+        {
+            console.log('pre split RIGHT');
+            console.log(this.clues[this.transposed][index]);
+            this.show_line(index);
+        }
+
         //Analyse split_fields from RIGHT
         current_clue = this.clues[this.transposed][index].length - 1;
         current_split_field = split_fields.length - 1;
@@ -289,6 +252,13 @@ export default class Nonogram
                     current_clue--;
                 }
             }
+        }
+
+        if(this.debug_line == index && this.iteration == this.debug_iteration)
+        {
+            console.log('pre blocks');
+            console.log(this.clues[this.transposed][index]);
+            this.show_line(index);
         }
 
         //Analyse block_fields
@@ -338,6 +308,15 @@ export default class Nonogram
                 }
             }
         }
+
+        if(this.debug_line == index && this.iteration == this.debug_iteration)
+        {
+            console.log('post blocks');
+            console.log(this.clues[this.transposed][index]);
+            this.show_line(index);
+            console.log('');
+        }
+
 
     }
 
@@ -461,6 +440,77 @@ export default class Nonogram
         this.dim[1] = tmp;
         */
         this.transposed = 1 - this.transposed; // 0 -> 1, 1 -> 0 (like a boolean!)
+    }
+
+    public show_line(index: number)
+    {
+        let line_dim = this.dim[this.transposed];
+
+        for(let i = 0; i < line_dim; i++)
+        {
+            switch(this.board[index][i])
+            {
+                case Cell.UNDEFINED:
+                {
+                    process.stdout.write('□ ');
+                    break;
+                }
+                case Cell.BLOCK:
+                {
+                    process.stdout.write('■ ');
+                    break;
+                }
+                case Cell.SPACE:
+                {
+                    process.stdout.write('x ');
+                    break;
+                }
+            }
+        }
+        console.log('');
+    }
+
+    public show()
+    {
+        let solution_x_dim = this.dim[0];
+        let solution_y_dim = this.dim[1];
+        let solution = this.board;
+        if(this.transposed)
+        {
+            solution = solution[0].map((col, i) => {
+                return solution.map((row) => {
+                    return row[i]
+                })
+            });
+        }
+
+        for(let j = 0; j < solution_y_dim; j++)
+        {
+            for(let i = 0; i < solution_x_dim; i++)
+            {
+                switch(solution[j][i])
+                {
+                    case Cell.UNDEFINED:
+                    {
+                        process.stdout.write('□ ');
+                        break;
+                    }
+                    case Cell.BLOCK:
+                    {
+                        process.stdout.write('■ ');
+                        break;
+                    }
+                    case Cell.SPACE:
+                    {
+                        process.stdout.write('  ');
+                        break;
+                    }
+                }
+            }
+            console.log('');
+        }
+
+        console.log('');
     }
 
     //endregion
