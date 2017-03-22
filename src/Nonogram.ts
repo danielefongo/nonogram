@@ -97,14 +97,15 @@ export default class Nonogram
     {
         console.log('[Solver] Started solving puzzle...');
 
-        for(this.iteration = 0; this.unsolved[this.transposed].length > 0 && this.iteration < 100; this.iteration++)
+        for(this.iteration = 0; this.unsolved[this.transposed].length > 0 && this.iteration < 30; this.iteration++)
         {
             console.log(this.iteration.toString(),'-th iteration / transposed: ',this.transposed);
             let j = 0;
             while(j < this.unsolved[this.transposed].length)
             {
                 let index: number = this.unsolved[this.transposed][j];
-                this._analyse(index);
+                this._simple_analyse(index);
+                this._analysis_forward(index);
                 this._simple_blocks(index);
                 this._simple_spaces(index);
                 if(this._is_completed(index))
@@ -163,6 +164,390 @@ export default class Nonogram
         {
             this.board[index][j] = Cell.SPACE;
         }
+    }
+
+    public _analysis_forward(index: number)
+    {
+        let last_clue_minstart: number = this.clues[this.transposed][index][0].minstart;
+        let last_clue_size: number = this.clues[this.transposed][index][0].value;
+        for(let i = 1; i < this.clues[this.transposed][index].length; i++)
+        {
+            if(this.clues[this.transposed][index][i].minstart < last_clue_minstart + last_clue_size + 1)
+                this.clues[this.transposed][index][i].minstart = last_clue_minstart + last_clue_size + 1;
+
+            last_clue_size = this.clues[this.transposed][index][i].value;
+            last_clue_minstart = this.clues[this.transposed][index][i].minstart;
+        }
+
+        let last_clue_maxend: number = this.clues[this.transposed][index][this.clues[this.transposed][index].length - 1].maxend;
+        last_clue_size = this.clues[this.transposed][index][this.clues[this.transposed][index].length - 1].value;
+
+        for(let i = this.clues[this.transposed][index].length - 2; i >= 0; i--)
+        {
+            if(this.clues[this.transposed][index][i].maxend > last_clue_maxend - last_clue_size - 1)
+                this.clues[this.transposed][index][i].maxend = last_clue_maxend - last_clue_size - 1;
+
+            last_clue_size = this.clues[this.transposed][index][i].value;
+            last_clue_maxend = this.clues[this.transposed][index][i].maxend;
+        }
+    }
+
+    public _simple_analyse(index: number)
+    {
+        //LEFT ANALYSYS
+        let available_size : number = 0;
+        let clue_sum : number = 0;
+        let current_clue : number = 0;
+        let exit_analysis : boolean = false;
+        let exit_clues : boolean = false;
+        let field_start : number = -1;
+        let field_end : number = -1;
+        let block_found : boolean = false;
+
+        for(let i = 0; i < this.board[index].length; i++)
+            if(this.board[index][i] == Cell.BLOCK || this.board[index][i] == Cell.UNDEFINED)
+                available_size++;
+        for(let i = 0; i < this.clues[this.transposed][index].length; i++)
+            clue_sum += this.clues[this.transposed][index][i].value;
+
+        for(let i = 0; i < this.board[index].length; i++)
+        {
+            if(!exit_analysis)
+            {
+                switch(this.board[index][i])
+                {
+                    case Cell.BLOCK :
+                        block_found = true;
+                        if(field_start == -1) field_start = i;
+                        field_end = i;
+                        break;
+                    case Cell.UNDEFINED:
+                        if(field_start == -1) field_start = i;
+                        field_end = i;
+                        break;
+                    case Cell.SPACE :
+                    {
+                        exit_clues = false;
+                        if(field_start != -1 && field_end != -1)
+                        {
+                            for(let j = current_clue; !exit_analysis && !exit_clues && j < this.clues[this.transposed][index].length; j++)
+                            {
+
+                                if(field_end - field_start + 1 >= this.clues[this.transposed][index][current_clue].value)
+                                {
+                                    if (this.clues[this.transposed][index][current_clue].minstart < field_start)
+                                        this.clues[this.transposed][index][current_clue].minstart = field_start;
+
+                                    if (!block_found && available_size - (field_end - field_start + 1) >= clue_sum)
+                                        exit_analysis = true;
+                                    else //univocal
+                                    {
+                                        if (this.clues[this.transposed][index][current_clue].maxend > field_end)
+                                            this.clues[this.transposed][index][current_clue].maxend = field_end;
+
+                                        if(field_end - field_start + 1 == this.clues[this.transposed][index][current_clue].value)
+                                            available_size -= (this.clues[this.transposed][index][current_clue].value);
+                                        else
+                                            available_size -= (this.clues[this.transposed][index][current_clue].value) + 1;
+
+                                        field_start += this.clues[this.transposed][index][current_clue].value + 1;
+
+                                        clue_sum -= this.clues[this.transposed][index][current_clue].value;
+
+                                        current_clue++;
+
+                                        block_found = false;
+                                        if(field_end - field_start < 0)
+                                            exit_clues = true;
+                                    }
+                                }
+                                else
+                                {
+                                    exit_clues = true;
+                                    available_size -= (field_end - field_start + 1);
+                                }
+
+                            }
+                        }
+                        field_start = -1;
+                        field_end = -1;
+                        block_found = false;
+                        break;
+                    }
+
+                }
+
+            }
+        }
+
+
+        //RIGHT ANALYSIS
+        available_size = 0;
+        clue_sum = 0;
+        current_clue = this.clues[this.transposed][index].length - 1;
+        exit_analysis = false;
+        exit_clues = false;
+        field_start = -1;
+        field_end = -1;
+
+        for(let i = 0; i < this.board[index].length; i++)
+            if(this.board[index][i] == Cell.BLOCK || this.board[index][i] == Cell.UNDEFINED)
+                available_size++;
+        for(let i = 0; i < this.clues[this.transposed][index].length; i++)
+            clue_sum += this.clues[this.transposed][index][i].value;
+
+        for(let i = this.board[index].length - 1; i >= 0; i--)
+        {
+            if(!exit_analysis)
+            {
+                switch(this.board[index][i])
+                {
+                    case Cell.BLOCK :
+                        block_found = true;
+                    case Cell.UNDEFINED:
+                        if(field_end == -1) field_end = i;
+                        field_start = i;
+                        break;
+                    case Cell.SPACE :
+                    {
+
+                        if(field_start != -1 && field_end != -1)
+                        {
+                            exit_clues = false;
+                            for(let j = current_clue; !exit_analysis && !exit_clues && j >= 0; j--)
+                            {
+                                if(field_end - field_start + 1 >= this.clues[this.transposed][index][current_clue].value)
+                                {
+                                    if (this.clues[this.transposed][index][current_clue].maxend > field_end)
+                                        this.clues[this.transposed][index][current_clue].maxend = field_end;
+
+                                    if (!block_found && available_size - (field_end - field_start + 1) >= clue_sum)
+                                        exit_analysis = true;
+                                    else //univocal
+                                    {
+                                        if (this.clues[this.transposed][index][current_clue].minstart < field_start)
+                                            this.clues[this.transposed][index][current_clue].minstart = field_start;
+
+                                        if(field_end - field_start + 1 == this.clues[this.transposed][index][current_clue].value)
+                                            available_size -= (this.clues[this.transposed][index][current_clue].value);
+                                        else
+                                            available_size -= (this.clues[this.transposed][index][current_clue].value) + 1;
+
+                                        field_end -= this.clues[this.transposed][index][current_clue].value + 1;
+
+                                        clue_sum -= this.clues[this.transposed][index][current_clue].value;
+
+                                        current_clue--;
+
+                                        block_found = false;
+                                        if(field_end - field_start < 0)
+                                            exit_clues = true;
+                                    }
+                                }
+                                else
+                                {
+                                    exit_clues = true;
+                                    available_size -= (field_end - field_start + 1);
+                                }
+                            }
+                        }
+                        field_start = -1;
+                        field_end = -1;
+                        block_found = false;
+                        break;
+                    }
+
+                }
+
+            }
+        }
+
+
+        //BLOCK
+        let blockfield_start : number = -1;
+        let blockfield_end : number = -1;
+        let last_univocal_blockfield_start : number = -1;
+        let last_univocal_blockfield_end : number = -1;
+        let last_univocal_clue : number = -1;
+        let last_univocal : boolean = true;
+        field_start = -1;
+        field_end = -1;
+        let clue_counter : number = 0;
+
+        for(let i = 0; i < this.board[index].length; i++)
+        {
+
+            switch (this.board[index][i])
+            {
+                case Cell.BLOCK :
+                    if (field_start == -1) field_start = i;
+                    field_end = i;
+                    if (blockfield_start == -1) blockfield_start = i;
+                    blockfield_end = i;
+                    break;
+
+                case Cell.SPACE :
+                    if (last_univocal && blockfield_start != -1 && blockfield_end != -1)
+                    {
+                        clue_counter = 0;
+                        for(let j = 0; j < this.clues[this.transposed][index].length; j++) {
+                            if (this.clues[this.transposed][index][j].minstart <= blockfield_start && this.clues[this.transposed][index][j].maxend >= blockfield_end)
+                            {
+                                clue_counter++;
+                                current_clue = j;
+                            }
+                        }
+
+                        if(clue_counter == 1)
+                        {
+
+                            if(last_univocal_blockfield_start != -1 && last_univocal_blockfield_end != -1)
+                            {
+                                if (current_clue == last_univocal_clue) {
+
+                                    if (this.clues[this.transposed][index][current_clue].maxend > last_univocal_blockfield_start + this.clues[this.transposed][index][current_clue].value - 1)
+                                        this.clues[this.transposed][index][current_clue].maxend = last_univocal_blockfield_start + this.clues[this.transposed][index][current_clue].value - 1;
+                                }
+                                else if(last_univocal_blockfield_end == blockfield_start - 2)
+                                {
+                                    this.clues[this.transposed][index][last_univocal_clue].maxend = last_univocal_blockfield_end;
+                                    this.clues[this.transposed][index][current_clue].minstart = blockfield_start;
+                                }
+                            }
+
+                            if (this.clues[this.transposed][index][current_clue].minstart < blockfield_end - this.clues[this.transposed][index][current_clue].value + 1)
+                                this.clues[this.transposed][index][current_clue].minstart = blockfield_end - this.clues[this.transposed][index][current_clue].value + 1;
+
+                            if(this.clues[this.transposed][index][current_clue].maxend > field_end)
+                                this.clues[this.transposed][index][current_clue].maxend = field_end;
+
+                            if(this.clues[this.transposed][index][current_clue].maxend > blockfield_start + this.clues[this.transposed][index][current_clue].value - 1)
+                                this.clues[this.transposed][index][current_clue].maxend = blockfield_start + this.clues[this.transposed][index][current_clue].value - 1;
+
+                            last_univocal_blockfield_start = blockfield_start;
+                            last_univocal_blockfield_end = blockfield_end;
+                            last_univocal_clue = current_clue;
+                            last_univocal = true; //redundant
+
+                        }
+                        else
+                            last_univocal = false;
+                    }
+                    blockfield_start = -1;
+                    blockfield_end = -1;
+                    last_univocal_blockfield_start = -1;
+                    last_univocal_blockfield_end = -1;
+                    last_univocal = true;
+                    last_univocal_clue = -1;
+                    field_start = -1;
+                    field_end = -1;
+                    break;
+
+                case Cell.UNDEFINED :
+                    if (field_start == -1) field_start = i;
+                    field_end = i;
+
+                    if (last_univocal && blockfield_start != -1 && blockfield_end != -1)
+                    {
+                        clue_counter = 0;
+                        for(let j = 0; j < this.clues[this.transposed][index].length; j++) {
+                            if (this.clues[this.transposed][index][j].minstart <= blockfield_start && this.clues[this.transposed][index][j].maxend >= blockfield_end)
+                            {
+                                clue_counter++;
+                                current_clue = j;
+                            }
+                        }
+
+                        if(clue_counter == 1)
+                        {
+
+                            if(last_univocal_blockfield_start != -1 && last_univocal_blockfield_end != -1)
+                            {
+                                if (current_clue == last_univocal_clue) {
+
+                                    if (this.clues[this.transposed][index][current_clue].maxend > last_univocal_blockfield_start + this.clues[this.transposed][index][current_clue].value - 1)
+                                        this.clues[this.transposed][index][current_clue].maxend = last_univocal_blockfield_start + this.clues[this.transposed][index][current_clue].value - 1;
+                                }
+                                else if(last_univocal_blockfield_end == blockfield_start - 2)
+                                {
+                                    this.clues[this.transposed][index][last_univocal_clue].maxend = last_univocal_blockfield_end;
+                                    this.clues[this.transposed][index][current_clue].minstart = blockfield_start;
+                                }
+                            }
+
+                            if (this.clues[this.transposed][index][current_clue].minstart < blockfield_end - this.clues[this.transposed][index][current_clue].value + 1)
+                                this.clues[this.transposed][index][current_clue].minstart = blockfield_end - this.clues[this.transposed][index][current_clue].value + 1;
+
+                            if(this.clues[this.transposed][index][current_clue].minstart < field_start)
+                                this.clues[this.transposed][index][current_clue].minstart = field_start;
+
+                            if(this.clues[this.transposed][index][current_clue].maxend > blockfield_start + this.clues[this.transposed][index][current_clue].value - 1)
+                                this.clues[this.transposed][index][current_clue].maxend = blockfield_start + this.clues[this.transposed][index][current_clue].value - 1;
+
+                            last_univocal_blockfield_start = blockfield_start;
+                            last_univocal_blockfield_end = blockfield_end;
+                            last_univocal_clue = current_clue;
+                            last_univocal = true; //redundant
+
+                        }
+                        else
+                            last_univocal = false;
+                    }
+                    blockfield_start = -1;
+                    blockfield_end = -1;
+                    break;
+            }
+
+        }
+        /*
+         //TODO : implement new block analysis
+         let last_univocal_blockfield_clue: number = -1;
+         let last_univocal_blockfield_end: number = 0;
+         let is_last_blockfield_univocal: boolean = false;
+         let split_fields: Field[] = this._split_by_spaces(index);
+
+         for(let current_split_field = 0; current_split_field < split_fields.length; current_split_field++)
+         {
+         let block_fields = this._extract_block_fields(index, split_fields[current_split_field].start, split_fields[current_split_field].end)
+         for(let current_block_field = 0; current_block_field < block_fields.length; current_block_field++)
+         {
+         let possible_clues = this._clues_per_blockfield(index, block_fields[current_block_field]);
+         if(possible_clues.length == 1)
+         {
+         let univocal_clue_index: number = possible_clues[0];
+
+         //JOIN!
+         if(is_last_blockfield_univocal && univocal_clue_index == last_univocal_blockfield_clue)
+         this._fill_field(index, {length: block_fields[current_block_field].start - last_univocal_blockfield_end + 1, start: last_univocal_blockfield_end, end: block_fields[current_block_field].start}, Cell.BLOCK);
+
+         //SPLIT!
+         if(is_last_blockfield_univocal && univocal_clue_index != last_univocal_blockfield_clue && last_univocal_blockfield_end == block_fields[current_block_field].start - 2)
+         this.board[index][last_univocal_blockfield_end + 1] = Cell.SPACE;
+
+         // Clue range reduction by split_field
+         if (this.clues[this.transposed][index][univocal_clue_index].minstart < split_fields[current_split_field].start)
+         this.clues[this.transposed][index][univocal_clue_index].minstart = split_fields[current_split_field].start;
+         if (this.clues[this.transposed][index][univocal_clue_index].maxend > split_fields[current_split_field].end)
+         this.clues[this.transposed][index][univocal_clue_index].maxend = split_fields[current_split_field].end;
+
+         // Clue range reduction by block_field extension
+         let extension: number = this.clues[this.transposed][index][univocal_clue_index].value - block_fields[current_block_field].length;
+
+         if (this.clues[this.transposed][index][univocal_clue_index].minstart < block_fields[current_block_field].start - extension)
+         this.clues[this.transposed][index][univocal_clue_index].minstart = block_fields[current_block_field].start - extension;
+         if (this.clues[this.transposed][index][univocal_clue_index].maxend > block_fields[current_block_field].end + extension)
+         this.clues[this.transposed][index][univocal_clue_index].maxend = block_fields[current_block_field].end + extension;
+
+         last_univocal_blockfield_clue = univocal_clue_index;
+         last_univocal_blockfield_end = block_fields[current_block_field].end;
+         is_last_blockfield_univocal = true;
+         }
+         else
+         {
+         is_last_blockfield_univocal = false;
+         }
+         }
+         }*/
     }
 
     //region UTILITIES
@@ -326,6 +711,12 @@ export default class Nonogram
             this.board[index][i] = type;
     }
 
+    public _fill_field2(index: number, start: number, end: number, type: Cell) //doesn't really require a Field, only a start and end...
+    {
+        for(let i = start; i <= end; i++)
+            this.board[index][i] = type;
+    }
+
     public _clues_per_blockfield(index: number, block_field: Field): number[]
     {
         let possible_clues: number[] = [];
@@ -435,10 +826,10 @@ export default class Nonogram
         });
 
         /*  //not useful anymore since this.dim[this.transpose] has the same result as the old x_dim
-        let tmp = this.dim[0];
-        this.dim[0] = this.dim[1];
-        this.dim[1] = tmp;
-        */
+         let tmp = this.dim[0];
+         this.dim[0] = this.dim[1];
+         this.dim[1] = tmp;
+         */
         this.transposed = 1 - this.transposed; // 0 -> 1, 1 -> 0 (like a boolean!)
     }
 
